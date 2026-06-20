@@ -9,8 +9,15 @@ pipeline {
                     reuseNode true
                 }
             }
+            environment {
+                HOME = "${WORKSPACE}"
+                NPM_CONFIG_CACHE = "${WORKSPACE}/.npm"
+                NPM_CONFIG_UPDATE_NOTIFIER = "false"
+                GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
+            }
             steps {
                 echo 'Running build automation'
+                sh 'mkdir -p $HOME $NPM_CONFIG_CACHE $GRADLE_USER_HOME'
                 sh 'chmod +x gradlew'
                 sh './gradlew build --no-daemon'
                 archiveArtifacts artifacts: 'dist/trainSchedule.zip'
