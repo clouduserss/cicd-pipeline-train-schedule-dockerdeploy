@@ -1,13 +1,22 @@
 pipeline {
     agent any
+
     stages {
         stage('Build') {
+            agent {
+                docker {
+                    image 'gradle:6.9.4-jdk11'
+                    reuseNode true
+                }
+            }
             steps {
                 echo 'Running build automation'
-                sh './gradlew build --no-daemon'
+                sh 'chmod +x gradlew'
+                sh './gradlew clean build --no-daemon'
                 archiveArtifacts artifacts: 'dist/trainSchedule.zip'
             }
         }
+
         stage('Build Docker Image') {
             when {
                 branch 'master'
@@ -15,12 +24,10 @@ pipeline {
             steps {
                 script {
                     app = docker.build("cloudusers/train-schedule")
-                    app.inside {
-                        sh 'echo $(curl localhost:8080)'
-                    }
                 }
             }
         }
+
         stage('Push Docker Image') {
             when {
                 branch 'master'
@@ -34,5 +41,5 @@ pipeline {
                 }
             }
         }
-    }   
+    }
 }
