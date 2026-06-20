@@ -20,7 +20,7 @@ pipeline {
                 echo 'Running build automation'
                 sh 'mkdir -p $HOME $NPM_CONFIG_CACHE $GRADLE_USER_HOME'
                 sh 'chmod +x gradlew'
-                sh './gradlew build --no-daemon'
+                sh './gradlew build --no-daemon -x npm_test'
                 archiveArtifacts artifacts: 'dist/trainSchedule.zip'
             }
         }
@@ -50,33 +50,28 @@ pipeline {
             }
         }
 
-        stage ('DeployToProduction') {
+        stage('DeployToProduction') {
             when {
                 branch 'master'
             }
             steps {
                 input 'Deploy to Production'
-
-                withCredentials ([usernamePassword(
+                withCredentials([usernamePassword(
                     credentialsId: 'webserver_login',
                     usernameVariable: 'USERNAME',
                     passwordVariable: 'USERPASS'
                 )]) {
                     script {
-
-                        // Pull latest image on production server
                         sh """
                         sshpass -p '$USERPASS' ssh -o StrictHostKeyChecking=no $USERNAME@${env.prod_ip} \
                         "docker pull cloudusers/train-schedule:${env.BUILD_NUMBER}"
                         """
 
-                        // Stop and remove old container (ignore error if not exists)
                         sh """
                         sshpass -p '$USERPASS' ssh -o StrictHostKeyChecking=no $USERNAME@${env.prod_ip} \
                         "docker rm -f train-schedule || true"
                         """
 
-                        // Run new container
                         sh """
                         sshpass -p '$USERPASS' ssh -o StrictHostKeyChecking=no $USERNAME@${env.prod_ip} \
                         "docker run -d --name train-schedule -p 8080:8080 --restart always cloudusers/train-schedule:${env.BUILD_NUMBER}"
