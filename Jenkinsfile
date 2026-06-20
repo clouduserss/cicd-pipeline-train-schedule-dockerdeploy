@@ -2,6 +2,7 @@ pipeline {
     agent any
 
     stages {
+
         stage('Build') {
             agent {
                 docker {
@@ -44,6 +45,42 @@ pipeline {
                     docker.withRegistry('https://registry.hub.docker.com', 'docker_hub_login') {
                         app.push("${env.BUILD_NUMBER}")
                         app.push("latest")
+                    }
+                }
+            }
+        }
+
+        stage ('DeployToProduction') {
+            when {
+                branch 'master'
+            }
+            steps {
+                input 'Deploy to Production'
+
+                withCredentials ([usernamePassword(
+                    credentialsId: 'webserver_login',
+                    usernameVariable: 'USERNAME',
+                    passwordVariable: 'USERPASS'
+                )]) {
+                    script {
+
+                        // Pull latest image on production server
+                        sh """
+                        sshpass -p '$USERPASS' ssh -o StrictHostKeyChecking=no $USERNAME@${env.prod_ip} \
+                        "docker pull cloudusers/train-schedule:${env.BUILD_NUMBER}"
+                        """
+
+                        // Stop and remove old container (ignore error if not exists)
+                        sh """
+                        sshpass -p '$USERPASS' ssh -o StrictHostKeyChecking=no $USERNAME@${env.prod_ip} \
+                        "docker rm -f train-schedule || true"
+                        """
+
+                        // Run new container
+                        sh """
+                        sshpass -p '$USERPASS' ssh -o StrictHostKeyChecking=no $USERNAME@${env.prod_ip} \
+                        "docker run -d --name train-schedule -p 8080:8080 --restart always cloudusers/train-schedule:${env.BUILD_NUMBER}"
+                        """
                     }
                 }
             }
